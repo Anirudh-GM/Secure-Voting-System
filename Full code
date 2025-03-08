@@ -1,0 +1,431 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_NAME_LENGTH 100
+#define MAX_PASSWORD_LENGTH 20
+#define MAX_VOTERS 100
+#define MAX_CANDIDATES 10
+#define MAX_ADMINS 10
+
+// Structure for a Voter
+struct Voter {
+    int id;
+    char name[MAX_NAME_LENGTH];
+    char password[MAX_PASSWORD_LENGTH];
+    int voted;  // 0: Not voted, 1: Voted
+    struct Voter* next;  // Linked List
+};
+
+// Structure for a Candidate
+struct Candidate {
+    int id;
+    char name[MAX_NAME_LENGTH];
+    int votes;  // Number of votes
+};
+
+// Structure for Admin
+struct Admin {
+    char username[MAX_NAME_LENGTH];
+    char password[MAX_PASSWORD_LENGTH];
+};
+
+// Hash function for storing passwords securely (for demonstration only)
+unsigned long hash(const char* str) {
+    unsigned long hash = 0;
+    int c;
+    while ((c = *str++)) {
+        hash = hash * 31 + c;
+    }
+    return hash;
+}
+
+// Function to create a new voter node
+struct Voter* createVoter(int id, const char* name, const char* password) {
+    struct Voter* newVoter = (struct Voter*)malloc(sizeof(struct Voter));
+    newVoter->id = id;
+    strcpy(newVoter->name, name);
+    strcpy(newVoter->password, password);
+    newVoter->voted = 0;
+    newVoter->next = NULL;
+    return newVoter;
+}
+
+// Function to add a voter to the linked list, checking for duplicates
+void addVoter(struct Voter** head, int id, const char* name, const char* password) {
+    // Check if the voter already exists
+    struct Voter* current = *head;
+    while (current != NULL) {
+        if (current->id == id) {
+            printf("Voter with ID %d already exists.\n", id);
+            return;
+        }
+        current = current->next;
+    }
+
+    struct Voter* newVoter = createVoter(id, name, password);
+    newVoter->next = *head;
+    *head = newVoter;
+    printf("Voter added successfully.\n");
+}
+
+// Function to delete a voter by ID
+void deleteVoter(struct Voter** head, int id) {
+    struct Voter* current = *head;
+    struct Voter* prev = NULL;
+
+    if (current != NULL && current->id == id) {
+        *head = current->next; // Move head
+        free(current); // Free old head
+        printf("Voter deleted successfully.\n");
+        return;
+    }
+
+    while (current != NULL && current->id != id) {
+        prev = current;
+        current = current->next;
+    }
+
+    if (current == NULL) {
+        printf("Voter not found.\n");
+        return;
+    }
+
+    prev->next = current->next;
+    free(current);
+    printf("Voter deleted successfully.\n");
+}
+
+// Function to search for a voter by ID
+struct Voter* searchVoter(struct Voter* head, int id) {
+    struct Voter* current = head;
+    while (current != NULL) {
+        if (current->id == id) {
+            return current;
+        }
+        current = current->next;
+    }
+    return NULL;  // Voter not found
+}
+
+// Function to check if the password matches
+int verifyPassword(struct Voter* voter, const char* password) {
+    return (hash(password) == hash(voter->password));
+}
+
+// Function to register a candidate
+void registerCandidate(struct Candidate candidates[], int* candidateCount, const char* name) {
+    if (*candidateCount >= MAX_CANDIDATES) {
+        printf("Maximum number of candidates reached.\n");
+        return;
+    }
+    candidates[*candidateCount].id = *candidateCount + 1;
+    strcpy(candidates[*candidateCount].name, name);
+    candidates[*candidateCount].votes = 0;
+    (*candidateCount)++;
+    printf("Candidate registered successfully.\n");
+}
+
+// Function to delete a candidate
+void deleteCandidate(struct Candidate candidates[], int* candidateCount, int id) {
+    if (id < 1 || id > *candidateCount) {
+        printf("Invalid candidate ID.\n");
+        return;
+    }
+    for (int i = id - 1; i < *candidateCount - 1; i++) {
+        candidates[i] = candidates[i + 1];  // Shift the candidates
+    }
+    (*candidateCount)--;  // Decrease candidate count
+    printf("Candidate deleted successfully.\n");
+}
+
+// Function to search for a candidate by ID
+struct Candidate* searchCandidate(struct Candidate candidates[], int candidateCount, int id) {
+    if (id < 1 || id > candidateCount) {
+        return NULL;  // Candidate not found
+    }
+    return &candidates[id - 1];  // Return the candidate pointer
+}
+
+// Function to vote for a candidate
+void vote(struct Voter* voter, struct Candidate candidates[], int candidateCount) {
+    if (voter->voted) {
+        printf("You have already voted.\n");
+        return;
+    }
+
+    printf("List of Candidates:\n");
+    for (int i = 0; i < candidateCount; i++) {
+        printf("%d. %s\n", candidates[i].id, candidates[i].name);
+    }
+
+    int candidateId;
+    printf("Enter candidate ID to vote for: ");
+    scanf("%d", &candidateId);
+
+    if (candidateId < 1 || candidateId > candidateCount) {
+        printf("Invalid candidate ID.\n");
+        return;
+    }
+
+    candidates[candidateId - 1].votes++;
+    voter->voted = 1;
+    printf("Vote successfully casted for %s.\n", candidates[candidateId - 1].name);
+}
+
+// Function to display voting results and the winning candidate
+void displayResults(struct Candidate candidates[], int candidateCount) {
+    printf("\nVoting Results:\n");
+    int maxVotes = -1;
+    int winnerIndex = -1;
+
+    for (int i = 0; i < candidateCount; i++) {
+        printf("%s: %d votes\n", candidates[i].name, candidates[i].votes);
+        if (candidates[i].votes > maxVotes) {
+            maxVotes = candidates[i].votes;
+            winnerIndex = i;
+        }
+    }
+
+    if (winnerIndex != -1) {
+        printf("\nWinner: %s with %d votes\n", candidates[winnerIndex].name, maxVotes);
+    } else {
+        printf("No winner yet.\n");
+    }
+}
+
+// Admin login function
+int adminLogin(struct Admin admins[], int adminCount) {
+    char username[MAX_NAME_LENGTH], password[MAX_PASSWORD_LENGTH];
+    printf("Enter admin username: ");
+    scanf("%s", username);
+    printf("Enter admin password: ");
+    scanf("%s", password);
+
+    for (int i = 0; i < adminCount; i++) {
+        if (strcmp(admins[i].username, username) == 0 && hash(password) == hash(admins[i].password)) {
+            printf("Admin login successful.\n");
+            return 1;  // Successful login
+        }
+    }
+    printf("Invalid username or password.\n");
+    return 0;  // Failed login
+}
+
+// Voter login and operations
+void voterOperations(struct Voter* voters, struct Candidate candidates[], int candidateCount) {
+    int id;
+    char password[MAX_PASSWORD_LENGTH];
+
+    printf("Enter voter ID: ");
+    scanf("%d", &id);
+    getchar(); // Consume newline left by scanf
+
+    struct Voter* voter = searchVoter(voters, id);
+
+    if (!voter) {
+        printf("Voter not found.\n");
+        return;
+    }
+
+    printf("Enter voter password: ");
+    fgets(password, MAX_PASSWORD_LENGTH, stdin);
+    password[strcspn(password, "\n")] = '\0';  // Remove trailing newline
+
+    if (!verifyPassword(voter, password)) {
+        printf("Incorrect password.\n");
+        return;
+    }
+
+    int choice;
+    while (1) {
+        printf("\n----- Voter Operations -----\n");
+        printf("1. Cast Vote\n");
+        printf("2. Return to Main Menu\n");
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+
+        switch (choice) {
+            case 1:
+                vote(voter, candidates, candidateCount);
+                return;  // Return after voting
+            case 2:
+                return;  // Return to main menu
+            default:
+                printf("Invalid choice. Try again.\n");
+        }
+    }
+}
+
+// Admin operations menu
+void adminOperations(struct Voter** voters, struct Candidate candidates[], int* candidateCount, struct Admin admins[], int* adminCount) 
+{
+    int choice;
+    while (1) {
+        printf("\n----- Admin Operations -----\n");
+        printf("1. Voter Info\n");
+        printf("2. Candidate Info\n");
+        printf("3. Display Results\n");
+        printf("4. Exit\n");
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+
+        switch (choice) {
+            case 1: {
+                int subChoice;
+                int flag=0;
+                while (flag!=1) {
+                    printf("\n----- Voter Info -----\n");
+                    printf("1. Add Voter\n");
+                    printf("2. Delete Voter\n");
+                    printf("3. Search Voter\n");
+                    printf("4. Go Back\n");
+                    printf("Enter your choice: ");
+                    scanf("%d", &subChoice);
+
+                    switch (subChoice) {
+                        case 1: {
+                            int id;
+                            char name[MAX_NAME_LENGTH], password[MAX_PASSWORD_LENGTH];
+                            printf("Enter voter ID: ");
+                            scanf("%d", &id);
+                            getchar(); // Consume newline
+                            printf("Enter voter name: ");
+                            fgets(name, sizeof(name), stdin);
+                            name[strcspn(name, "\n")] = '\0';  // Remove newline
+                            printf("Enter voter password: ");
+                            fgets(password, sizeof(password), stdin);
+                            password[strcspn(password, "\n")] = '\0';  // Remove newline
+                            addVoter(voters, id, name, password);
+                            break;
+                        }
+                        case 2: {
+                            int id;
+                            printf("Enter voter ID to delete: ");
+                            scanf("%d", &id);
+                            deleteVoter(voters, id);
+                            break;
+                        }
+                        case 3: {
+                            int id;
+                            printf("Enter voter ID to search: ");
+                            scanf("%d", &id);
+                            struct Voter* voter = searchVoter(*voters, id);
+                            if (voter) {
+                                printf("Voter found: ID=%d, Name=%s\n", voter->id, voter->name);
+                            } else {
+                                printf("Voter not found.\n");
+                            }
+                            break;
+                        }
+                        case 4:
+                            flag=1;
+                            break;// Go back to admin operations
+                        default:
+                            printf("Invalid choice. Try again.\n");
+                    }
+                }
+                break;
+            }
+            case 2: {
+                int subChoice;
+                int flag=0;
+                while (flag!=1) {
+                    printf("\n----- Candidate Info -----\n");
+                    printf("1. Add Candidate\n");
+                    printf("2. Delete Candidate\n");
+                    printf("3. Search Candidate\n");
+                    printf("4. Go Back\n");
+                    printf("Enter your choice: ");
+                    scanf("%d", &subChoice);
+
+                    switch (subChoice) {
+                        case 1: {
+                            char name[MAX_NAME_LENGTH];
+                            printf("Enter candidate name: ");
+                            getchar(); // Clear newline
+                            fgets(name, sizeof(name), stdin);
+                            name[strcspn(name, "\n")] = '\0';  // Remove newline
+                            registerCandidate(candidates, candidateCount, name);
+                            break;
+                        }
+                        case 2: {
+                            int id;
+                            printf("Enter candidate ID to delete: ");
+                            scanf("%d", &id);
+                            deleteCandidate(candidates, candidateCount, id);
+                            break;
+                        }
+                        case 3: {
+                            int id;
+                            printf("Enter candidate ID to search: ");
+                            scanf("%d", &id);
+                            struct Candidate* candidate = searchCandidate(candidates, *candidateCount, id);
+                            if (candidate) {
+                                printf("Candidate found: ID=%d, Name=%s, Votes=%d\n", candidate->id, candidate->name, candidate->votes);
+                            } else {
+                                printf("Candidate not found.\n");
+                            }
+                            break;
+                        }
+                        case 4:
+                            flag=1;
+                            break;// Go back to admin operations
+                        default:
+                            printf("Invalid choice. Try again.\n");
+                    }
+                }
+                break;
+            }
+            case 3:
+                displayResults(candidates, *candidateCount);
+                break;
+            case 4:
+                return;  // Exit admin operations
+            default:
+                printf("Invalid choice. Try again.\n");
+        }
+    }
+}
+
+int main() {
+    struct Voter* voters = NULL;
+    struct Candidate candidates[MAX_CANDIDATES];
+    int candidateCount = 0;
+    struct Admin admins[MAX_ADMINS];
+    int adminCount = 0;
+
+    // Add default admin
+    strcpy(admins[0].username, "admin");
+    strcpy(admins[0].password, "admin123");
+    adminCount++;
+
+    int choice;
+    while (1) {
+        printf("\n----- Main Menu -----\n");
+        printf("1. Admin Login\n");
+        printf("2. Voter Operations\n");
+        printf("3. Exit\n");
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+        getchar(); // Consume newline character
+
+        switch (choice) {
+            case 1:
+                if (adminLogin(admins, adminCount)) {
+                    adminOperations(&voters, candidates, &candidateCount, admins, &adminCount);
+                }
+                break;
+            case 2:
+                voterOperations(voters, candidates, candidateCount);
+                break;
+            case 3:
+                printf("Exiting the program. Goodbye!\n");
+                return 0;
+            default:
+                printf("Invalid choice. Try again.\n");
+        }
+    }
+
+    return 0;
+}
